@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+
+# production build
+dist
+dist-ssr
+*.local
+
+# env files
+.env
+.env.local
+.env.production.local
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# editor
+.DS_Store
+.vscode
+.idea
