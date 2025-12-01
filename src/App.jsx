@@ -417,14 +417,14 @@ const parseNewsRows = (rows, source) => {
             const itemCount = dataToDisplay.length;
 
             let gridClass;
-            if (itemCount <= 3) {
+            if (itemCount <= 2) {
               gridClass = `grid grid-cols-${itemCount} gap-2 md:gap-3`;
-            } else if (itemCount === 4) {
-              gridClass = 'grid grid-cols-2 gap-2 md:gap-3';
+            } else if (itemCount <= 4) {
+              gridClass = 'grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3';
             } else if (itemCount === 5) {
               return (
                 <div className="space-y-2 md:space-y-3">
-                  <div className="grid grid-cols-3 gap-2 md:gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
                     {dataToDisplay.slice(0, 3).map((item, idx) => (
                       <MarketWidget
                         key={idx}
@@ -445,7 +445,7 @@ const parseNewsRows = (rows, source) => {
                 </div>
               );
             } else {
-              gridClass = 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3';
+              gridClass = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3';
             }
 
             return (
