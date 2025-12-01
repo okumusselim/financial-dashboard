@@ -88,12 +88,14 @@ const parseNewsRows = (rows, source) => {
     if (!row || row.length < 1) continue;
     
     const title = row[0]; // Column A
+    const url = row[2]; // Column C
     if (!title) continue;
     
     news.push({
       source: source,
       time: 'Recent', // We don't have timestamp data, so use "Recent"
       title: title,
+      url: url,
     });
   }
   return news;
@@ -233,9 +235,12 @@ const parseNewsRows = (rows, source) => {
       </h3>
       <div className="space-y-3">
         {news.map((item, idx) => (
-          <div
+          <a
             key={idx}
-            className="group cursor-pointer hover:bg-slate-700/40 p-2 rounded transition-colors border border-transparent hover:border-emerald-900/30"
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block group cursor-pointer hover:bg-slate-700/40 p-2 rounded transition-colors border border-transparent hover:border-emerald-900/30"
           >
             <div className="flex items-start gap-2 mb-1">
               <span className={`text-[10px] px-2 py-0.5 rounded font-medium flex-shrink-0 ${item.source === 'BBC' || item.source === 'BBC Turkey' ? 'bg-rose-900/40 text-rose-300 border border-rose-800/30' :
@@ -247,7 +252,7 @@ const parseNewsRows = (rows, source) => {
             <p className="text-sm text-slate-300 group-hover:text-emerald-100 leading-snug transition-colors">
               {item.title}
             </p>
-          </div>
+          </a>
         ))}
       </div>
     </div>
