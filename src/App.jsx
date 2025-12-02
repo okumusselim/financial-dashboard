@@ -52,19 +52,27 @@ const TabbedDashboard = () => {
 
   // Trigger webhook update
   const triggerWebhookUpdate = async (webhookType, displayName) => {
+    const webhookUrls = {
+      UPDATE_CURRENCIES: 'https://selim-okumus1.app.n8n.cloud/webhook/update-fx',
+      UPDATE_CRYPTO: 'https://selim-okumus1.app.n8n.cloud/webhook/update-crypto',
+    };
+
+    const targetUrl = webhookUrls[webhookType];
+
+    if (!targetUrl) {
+      setToast(`Webhook for ${displayName} not configured yet`);
+      return;
+    }
+
     setToast(`Updating ${displayName}... This may take 2-3 minutes.`);
     setShowUpdateMenu(false);
 
     try {
-      // Use Vercel serverless function as proxy to avoid CORS issues
-      const response = await fetch('/api/webhook-proxy', {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          webhookType: webhookType
-        })
       });
 
       if (response.ok) {
@@ -621,4 +629,4 @@ const TabbedDashboard = () => {
 
 export default TabbedDashboard;
 // Force rebuild
-// Force rebuild 
+// Force rebuild
