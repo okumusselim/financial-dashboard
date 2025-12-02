@@ -29,13 +29,13 @@ export default async function handler(req, res) {
   try {
     // Use dynamic import for https module
     const https = await import('https');
-    const url = await import('url');
     
-    const parsedUrl = url.parse(targetUrl);
+    // Use modern URL API instead of deprecated url.parse()
+    const parsedUrl = new URL(targetUrl);
     
     const options = {
       hostname: parsedUrl.hostname,
-      path: parsedUrl.path,
+      path: parsedUrl.pathname,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,11 +51,17 @@ export default async function handler(req, res) {
         });
         
         response.on('end', () => {
+          console.log('n8n response status:', response.statusCode);
+          
           if (response.statusCode >= 200 && response.statusCode < 300) {
             res.status(200).json({ success: true });
             resolve();
           } else {
-            res.status(500).json({ error: 'Webhook failed', status: response.statusCode });
+            res.status(500).json({ 
+              error: 'Webhook failed', 
+              status: response.statusCode,
+              data: data 
+            });
             resolve();
           }
         });
