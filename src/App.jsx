@@ -24,8 +24,8 @@ const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 // Webhook URLs for updates (add your n8n webhook URLs here)
 const WEBHOOKS = {
-  UPDATE_CURRENCIES: 'https://selim-okumus1.app.n8n.cloud/webhook/update-fx',
-  UPDATE_CRYPTO: 'https://selim-okumus1.app.n8n.cloud/webhook/update-crypto',
+  UPDATE_ALL: 'YOUR_UPDATE_ALL_WEBHOOK_URL',
+  UPDATE_WORLD_NEWS: 'YOUR_UPDATE_WORLD_NEWS_WEBHOOK_URL',
   // Add more webhooks as you create them:
   // UPDATE_TURKEY_NEWS: 'YOUR_TURKEY_NEWS_WEBHOOK_URL',
   // UPDATE_INDICES: 'YOUR_INDICES_WEBHOOK_URL',
@@ -52,22 +52,19 @@ const TabbedDashboard = () => {
 
   // Trigger webhook update
   const triggerWebhookUpdate = async (webhookType, displayName) => {
-    const webhookUrl = WEBHOOKS[webhookType];
-    
-    if (!webhookUrl || webhookUrl.includes('YOUR_')) {
-      setToast(`Webhook for ${displayName} not configured yet`);
-      return;
-    }
-
     setToast(`Updating ${displayName}... This may take 2-3 minutes.`);
     setShowUpdateMenu(false);
 
     try {
-      const response = await fetch(webhookUrl, {
+      // Use Vercel serverless function as proxy to avoid CORS issues
+      const response = await fetch('/api/webhook-proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          webhookType: webhookType
+        })
       });
 
       if (response.ok) {
