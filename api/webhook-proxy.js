@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -13,7 +13,7 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { webhookType } = req.body;
+  const { webhookType } = req.body || {};
 
   const webhookUrls = {
     UPDATE_CURRENCIES: 'https://selim-okumus1.app.n8n.cloud/webhook/update-fx',
@@ -26,42 +26,51 @@ export default function handler(req, res) {
     return res.status(400).json({ error: 'Invalid webhook type' });
   }
 
-  // Use native https module
-  const https = require('https');
-  const url = require('url');
-
-  const parsedUrl = url.parse(targetUrl);
-  
-  const options = {
-    hostname: parsedUrl.hostname,
-    path: parsedUrl.path,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': 0
-    }
-  };
-
-  const request = https.request(options, (response) => {
-    let data = '';
+  try {
+    // Use dynamic import for https module
+    const https = await import('https');
+    const url = await import('url');
     
-    response.on('data', (chunk) => {
-      data += chunk;
-    });
+    const parsedUrl = url.parse(targetUrl);
     
-    response.on('end', () => {
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        res.status(200).json({ success: true });
-      } else {
-        res.status(500).json({ error: 'Webhook failed', status: response.statusCode });
+    const options = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       }
+    };
+
+    return new Promise((resolve) => {
+      const request = https.request(options, (response) => {
+        let data = '';
+        
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            res.status(200).json({ success: true });
+            resolve();
+          } else {
+            res.status(500).json({ error: 'Webhook failed', status: response.statusCode });
+            resolve();
+          }
+        });
+      });
+
+      request.on('error', (error) => {
+        console.error('Request error:', error);
+        res.status(500).json({ error: error.message });
+        resolve();
+      });
+
+      request.end();
     });
-  });
-
-  request.on('error', (error) => {
-    console.error('Request error:', error);
-    res.status(500).json({ error: error.message });
-  });
-
-  request.end();
+  } catch (error) {
+    console.error('Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
 }
