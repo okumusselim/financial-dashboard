@@ -1,37 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, RefreshCw, Activity, DollarSign, BarChart3, Newspaper, Bitcoin } from 'lucide-react';
 
-// Toast notification component
-const Toast = ({ message, onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 5000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  return (
-    <div className="fixed top-4 right-4 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md">
-      <div className="flex items-center gap-2">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-        <span>{message}</span>
-      </div>
-    </div>
-  );
-};
-
 // Configuration
 const SHEET_ID = import.meta.env.VITE_SHEET_ID || '1OuEvGdiiG8qQSEbAIVaMyitUsr2bBc6WaxnyjjvC1Uc';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-
-// Webhook URLs for updates (add your n8n webhook URLs here)
-const WEBHOOKS = {
-  UPDATE_ALL: 'YOUR_UPDATE_ALL_WEBHOOK_URL',
-  UPDATE_WORLD_NEWS: 'YOUR_UPDATE_WORLD_NEWS_WEBHOOK_URL',
-  // Add more webhooks as you create them:
-  // UPDATE_TURKEY_NEWS: 'YOUR_TURKEY_NEWS_WEBHOOK_URL',
-  // UPDATE_INDICES: 'YOUR_INDICES_WEBHOOK_URL',
-  // etc.
-};
-
 console.log('API Key loaded:', API_KEY ? 'YES' : 'NO');
 console.log('Sheet ID:', SHEET_ID);
 const TabbedDashboard = () => {
@@ -46,138 +18,88 @@ const TabbedDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showUpdateMenu, setShowUpdateMenu] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-
-  // Trigger webhook update
-  const triggerWebhookUpdate = async (webhookType, displayName) => {
-    const webhookUrls = {
-      UPDATE_CURRENCIES: 'https://selim-okumus1.app.n8n.cloud/webhook/update-fx',
-      UPDATE_CRYPTO: 'https://selim-okumus1.app.n8n.cloud/webhook/update-crypto',
-    };
-
-    const targetUrl = webhookUrls[webhookType];
-
-    if (!targetUrl) {
-      setToast(`Webhook for ${displayName} not configured yet`);
-      return;
-    }
-
-    setToast(`Updating ${displayName}... This may take 2-3 minutes.`);
-    setShowUpdateMenu(false);
-
-    try {
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        // Wait a bit then refresh the data
-        setTimeout(async () => {
-          await fetchSheetData();
-          setToast(`${displayName} updated successfully!`);
-        }, 3000);
-      } else {
-        setToast(`Failed to update ${displayName}`);
-      }
-    } catch (error) {
-      console.error('Webhook error:', error);
-      setToast(`Error updating ${displayName}`);
-    }
-  };
 
   // Fetch data from Google Sheets
   // Fetch data from Google Sheets
-  const fetchSheetData = async () => {
-    try {
-      setRefreshing(true);
+const fetchSheetData = async () => {
+  try {
+    setRefreshing(true);
 
-      // Fetch Core markets tab
-      const marketResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
-      );
+    // Fetch Core markets tab
+    const marketResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
+    );
 
-      if (!marketResponse.ok) {
-        throw new Error('Failed to fetch market data');
-      }
-
-      const marketResult = await marketResponse.json();
-      const marketRows = marketResult.values;
-
-      // Fetch BBC news
-      const bbcResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
-      );
-      const bbcResult = await bbcResponse.json();
-      const bbcRows = bbcResult.values || [];
-
-      // Fetch CNN news
-      const cnnResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
-      );
-      const cnnResult = await cnnResponse.json();
-      const cnnRows = cnnResult.values || [];
-
-      // Fetch BBC TR news
-      const bbcTrResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
-      );
-      const bbcTrResult = await bbcTrResponse.json();
-      const bbcTrRows = bbcTrResult.values || [];
-
-      // Parse the sheet data
-      const parsedData = parseSheetData(marketRows);
-
-      // Parse news data
-      parsedData.NEWS.worldNews = [
-        ...parseNewsRows(bbcRows, 'BBC'),
-        ...parseNewsRows(cnnRows, 'CNN')
-      ];
-
-      parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
-
-      setData(parsedData);
-      setError(null);
-      setLastUpdated(new Date().toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }));
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err.message);
-    } finally {
-      setRefreshing(false);
-      setLoading(false);
+    if (!marketResponse.ok) {
+      throw new Error('Failed to fetch market data');
     }
-  };
 
-  // Helper function to parse news rows
-  const parseNewsRows = (rows, source) => {
-    const news = [];
-    for (let i = 1; i < rows.length; i++) { // Skip header row
-      const row = rows[i];
-      if (!row || row.length < 1) continue;
+    const marketResult = await marketResponse.json();
+    const marketRows = marketResult.values;
 
-      const title = row[0]; // Column A
-      const url = row[2]; // Column C
-      if (!title) continue;
+    // Fetch BBC news
+    const bbcResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
+    );
+    const bbcResult = await bbcResponse.json();
+    const bbcRows = bbcResult.values || [];
 
-      news.push({
-        source: source,
-        time: 'Recent', // We don't have timestamp data, so use "Recent"
-        title: title,
-        url: url,
-      });
-    }
-    return news;
-  };
+    // Fetch CNN news
+    const cnnResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
+    );
+    const cnnResult = await cnnResponse.json();
+    const cnnRows = cnnResult.values || [];
+
+    // Fetch BBC TR news
+    const bbcTrResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
+    );
+    const bbcTrResult = await bbcTrResponse.json();
+    const bbcTrRows = bbcTrResult.values || [];
+
+    // Parse the sheet data
+    const parsedData = parseSheetData(marketRows);
+
+    // Parse news data
+    parsedData.NEWS.worldNews = [
+      ...parseNewsRows(bbcRows, 'BBC'),
+      ...parseNewsRows(cnnRows, 'CNN')
+    ];
+
+    parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
+
+    setData(parsedData);
+    setError(null);
+  } catch (err) {
+    console.error('Error fetching data:', err);
+    setError(err.message);
+  } finally {
+    setRefreshing(false);
+    setLoading(false);
+  }
+};
+
+// Helper function to parse news rows
+const parseNewsRows = (rows, source) => {
+  const news = [];
+  for (let i = 1; i < rows.length; i++) { // Skip header row
+    const row = rows[i];
+    if (!row || row.length < 1) continue;
+
+    const title = row[0]; // Column A
+    const url = row[2]; // Column C
+    if (!title) continue;
+
+    news.push({
+      source: source,
+      time: 'Recent', // We don't have timestamp data, so use "Recent"
+      title: title,
+      url: url,
+    });
+  }
+  return news;
+};
 
   // Parse sheet rows into structured data
   const parseSheetData = (rows) => {
@@ -244,18 +166,6 @@ const TabbedDashboard = () => {
   useEffect(() => {
     fetchSheetData();
   }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showUpdateMenu && !event.target.closest('.relative')) {
-        setShowUpdateMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showUpdateMenu]);
 
   const handleRefresh = () => {
     fetchSheetData();
@@ -325,8 +235,10 @@ const TabbedDashboard = () => {
       </h3>
       <div className="space-y-3">
         {news.map((item, idx) => (
+          <div
           <a
             key={idx}
+            className="group cursor-pointer hover:bg-slate-700/40 p-2 rounded transition-colors border border-transparent hover:border-emerald-900/30"
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -334,7 +246,7 @@ const TabbedDashboard = () => {
           >
             <div className="flex items-start gap-2 mb-1">
               <span className={`text-[10px] px-2 py-0.5 rounded font-medium flex-shrink-0 ${item.source === 'BBC' || item.source === 'BBC Turkey' ? 'bg-rose-900/40 text-rose-300 border border-rose-800/30' :
-                'bg-blue-900/40 text-blue-300 border border-blue-800/30'
+                  'bg-blue-900/40 text-blue-300 border border-blue-800/30'
                 }`}>
                 {item.source}
               </span>
@@ -342,6 +254,7 @@ const TabbedDashboard = () => {
             <p className="text-sm text-slate-300 group-hover:text-emerald-100 leading-snug transition-colors">
               {item.title}
             </p>
+          </div>
           </a>
         ))}
       </div>
@@ -406,73 +319,19 @@ const TabbedDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/30 p-3 md:p-6">
-      {/* Toast Notification */}
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-      
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-emerald-400">Market Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            {lastUpdated ? `Last updated: ${lastUpdated}` : data?.lastUpdated}
-          </p>
+          <p className="text-sm text-slate-400 mt-1">{data?.lastUpdated}</p>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setShowUpdateMenu(!showUpdateMenu)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-700 to-emerald-800 text-emerald-50 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-900/50 border border-emerald-600/30"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Update</span>
-          </button>
-
-          {showUpdateMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_ALL', 'All Data')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg"
-              >
-                Update All
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_WORLD_NEWS', 'World News')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
-              >
-                Update World News
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_TURKEY_NEWS', 'Turkey News')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
-              >
-                Update Turkey News
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_INDICES', 'Indices')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
-              >
-                Update Indices
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_FUTURES', 'Futures')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
-              >
-                Update Futures
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_CURRENCIES', 'Currencies')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
-              >
-                Update Currencies
-              </button>
-              <button 
-                onClick={() => triggerWebhookUpdate('UPDATE_CRYPTO', 'Crypto')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg"
-              >
-                Update Crypto
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={handleRefresh}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-700 to-emerald-800 text-emerald-50 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-900/50 border border-emerald-600/30"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
       </div>
 
       {/* Main Tab Navigation */}
@@ -628,5 +487,5 @@ const TabbedDashboard = () => {
 };
 
 export default TabbedDashboard;
-// Force rebuild
-// Force rebuild
+// Force rebuild 
+// Force rebuild 
