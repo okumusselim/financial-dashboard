@@ -96,8 +96,7 @@ const TabbedDashboard = () => {
       if (!row || row.length < 1) continue;
 
       const title = row[0]; // Column A
-      constUX = row[2]; // Column C (Using separate variable to avoid conflict if url exists)
-      const url = row[2];
+      const url = row[2]; // Column C
       if (!title) continue;
 
       news.push({
