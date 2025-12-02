@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, Activity, DollarSign, BarChart3, Newspaper, Bitcoin } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Activity, DollarSign, BarChart3, Bitcoin } from 'lucide-react';
 
 // Configuration
 const SHEET_ID = import.meta.env.VITE_SHEET_ID || '1OuEvGdiiG8qQSEbAIVaMyitUsr2bBc6WaxnyjjvC1Uc';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-console.log('API Key loaded:', API_KEY ? 'YES' : 'NO');
-console.log('Sheet ID:', SHEET_ID);
+
 const TabbedDashboard = () => {
   const [activeMainTab, setActiveMainTab] = useState('INDEX');
   const [activeSubTab, setActiveSubTab] = useState({
@@ -20,86 +19,85 @@ const TabbedDashboard = () => {
   const [error, setError] = useState(null);
 
   // Fetch data from Google Sheets
-  // Fetch data from Google Sheets
-const fetchSheetData = async () => {
-  try {
-    setRefreshing(true);
+  const fetchSheetData = async () => {
+    try {
+      setRefreshing(true);
 
-    // Fetch Core markets tab
-    const marketResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
-    );
+      // Fetch Core markets tab
+      const marketResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
+      );
 
-    if (!marketResponse.ok) {
-      throw new Error('Failed to fetch market data');
+      if (!marketResponse.ok) {
+        throw new Error('Failed to fetch market data');
+      }
+
+      const marketResult = await marketResponse.json();
+      const marketRows = marketResult.values;
+
+      // Fetch BBC news
+      const bbcResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
+      );
+      const bbcResult = await bbcResponse.json();
+      const bbcRows = bbcResult.values || [];
+
+      // Fetch CNN news
+      const cnnResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
+      );
+      const cnnResult = await cnnResponse.json();
+      const cnnRows = cnnResult.values || [];
+
+      // Fetch BBC TR news
+      const bbcTrResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
+      );
+      const bbcTrResult = await bbcTrResponse.json();
+      const bbcTrRows = bbcTrResult.values || [];
+
+      // Parse the sheet data
+      const parsedData = parseSheetData(marketRows);
+
+      // Parse news data
+      parsedData.NEWS.worldNews = [
+        ...parseNewsRows(bbcRows, 'BBC'),
+        ...parseNewsRows(cnnRows, 'CNN')
+      ];
+
+      parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
+
+      setData(parsedData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
     }
+  };
 
-    const marketResult = await marketResponse.json();
-    const marketRows = marketResult.values;
+  // Helper function to parse news rows
+  const parseNewsRows = (rows, source) => {
+    const news = [];
+    for (let i = 1; i < rows.length; i++) { // Skip header row
+      const row = rows[i];
+      if (!row || row.length < 1) continue;
 
-    // Fetch BBC news
-    const bbcResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
-    );
-    const bbcResult = await bbcResponse.json();
-    const bbcRows = bbcResult.values || [];
+      const title = row[0]; // Column A
+      const url = row[2]; // Column C
+      if (!title) continue;
 
-    // Fetch CNN news
-    const cnnResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
-    );
-    const cnnResult = await cnnResponse.json();
-    const cnnRows = cnnResult.values || [];
-
-    // Fetch BBC TR news
-    const bbcTrResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
-    );
-    const bbcTrResult = await bbcTrResponse.json();
-    const bbcTrRows = bbcTrResult.values || [];
-
-    // Parse the sheet data
-    const parsedData = parseSheetData(marketRows);
-
-    // Parse news data
-    parsedData.NEWS.worldNews = [
-      ...parseNewsRows(bbcRows, 'BBC'),
-      ...parseNewsRows(cnnRows, 'CNN')
-    ];
-
-    parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
-
-    setData(parsedData);
-    setError(null);
-  } catch (err) {
-    console.error('Error fetching data:', err);
-    setError(err.message);
-  } finally {
-    setRefreshing(false);
-    setLoading(false);
-  }
-};
-
-// Helper function to parse news rows
-const parseNewsRows = (rows, source) => {
-  const news = [];
-  for (let i = 1; i < rows.length; i++) { // Skip header row
-    const row = rows[i];
-    if (!row || row.length < 1) continue;
-
-    const title = row[0]; // Column A
-    const url = row[2]; // Column C
-    if (!title) continue;
-
-    news.push({
-      source: source,
-      time: 'Recent', // We don't have timestamp data, so use "Recent"
-      title: title,
-      url: url,
-    });
-  }
-  return news;
-};
+      news.push({
+        source: source,
+        time: 'Recent', // We don't have timestamp data, so use "Recent"
+        title: title,
+        url: url,
+      });
+    }
+    return news;
+  };
 
   // Parse sheet rows into structured data
   const parseSheetData = (rows) => {
@@ -235,10 +233,8 @@ const parseNewsRows = (rows, source) => {
       </h3>
       <div className="space-y-3">
         {news.map((item, idx) => (
-          <div
           <a
             key={idx}
-            className="group cursor-pointer hover:bg-slate-700/40 p-2 rounded transition-colors border border-transparent hover:border-emerald-900/30"
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -246,7 +242,7 @@ const parseNewsRows = (rows, source) => {
           >
             <div className="flex items-start gap-2 mb-1">
               <span className={`text-[10px] px-2 py-0.5 rounded font-medium flex-shrink-0 ${item.source === 'BBC' || item.source === 'BBC Turkey' ? 'bg-rose-900/40 text-rose-300 border border-rose-800/30' :
-                  'bg-blue-900/40 text-blue-300 border border-blue-800/30'
+                'bg-blue-900/40 text-blue-300 border border-blue-800/30'
                 }`}>
                 {item.source}
               </span>
@@ -254,7 +250,6 @@ const parseNewsRows = (rows, source) => {
             <p className="text-sm text-slate-300 group-hover:text-emerald-100 leading-snug transition-colors">
               {item.title}
             </p>
-          </div>
           </a>
         ))}
       </div>
@@ -487,5 +482,3 @@ const parseNewsRows = (rows, source) => {
 };
 
 export default TabbedDashboard;
-// Force rebuild 
-// Force rebuild 
