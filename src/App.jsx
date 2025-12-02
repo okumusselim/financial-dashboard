@@ -18,88 +18,89 @@ const TabbedDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showUpdateMenu, setShowUpdateMenu] = useState(false);
 
   // Fetch data from Google Sheets
   // Fetch data from Google Sheets
-const fetchSheetData = async () => {
-  try {
-    setRefreshing(true);
-    
-    // Fetch Core markets tab
-    const marketResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
-    );
-    
-    if (!marketResponse.ok) {
-      throw new Error('Failed to fetch market data');
+  const fetchSheetData = async () => {
+    try {
+      setRefreshing(true);
+
+      // Fetch Core markets tab
+      const marketResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Core%20markets!A:E?key=${API_KEY}`
+      );
+
+      if (!marketResponse.ok) {
+        throw new Error('Failed to fetch market data');
+      }
+
+      const marketResult = await marketResponse.json();
+      const marketRows = marketResult.values;
+
+      // Fetch BBC news
+      const bbcResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
+      );
+      const bbcResult = await bbcResponse.json();
+      const bbcRows = bbcResult.values || [];
+
+      // Fetch CNN news
+      const cnnResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
+      );
+      const cnnResult = await cnnResponse.json();
+      const cnnRows = cnnResult.values || [];
+
+      // Fetch BBC TR news
+      const bbcTrResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
+      );
+      const bbcTrResult = await bbcTrResponse.json();
+      const bbcTrRows = bbcTrResult.values || [];
+
+      // Parse the sheet data
+      const parsedData = parseSheetData(marketRows);
+
+      // Parse news data
+      parsedData.NEWS.worldNews = [
+        ...parseNewsRows(bbcRows, 'BBC'),
+        ...parseNewsRows(cnnRows, 'CNN')
+      ];
+
+      parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
+
+      setData(parsedData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
     }
-    
-    const marketResult = await marketResponse.json();
-    const marketRows = marketResult.values;
-    
-    // Fetch BBC news
-    const bbcResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC!A:C?key=${API_KEY}`
-    );
-    const bbcResult = await bbcResponse.json();
-    const bbcRows = bbcResult.values || [];
-    
-    // Fetch CNN news
-    const cnnResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/CNN!A:C?key=${API_KEY}`
-    );
-    const cnnResult = await cnnResponse.json();
-    const cnnRows = cnnResult.values || [];
-    
-    // Fetch BBC TR news
-    const bbcTrResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/BBC%20TR!A:C?key=${API_KEY}`
-    );
-    const bbcTrResult = await bbcTrResponse.json();
-    const bbcTrRows = bbcTrResult.values || [];
-    
-    // Parse the sheet data
-    const parsedData = parseSheetData(marketRows);
-    
-    // Parse news data
-    parsedData.NEWS.worldNews = [
-      ...parseNewsRows(bbcRows, 'BBC'),
-      ...parseNewsRows(cnnRows, 'CNN')
-    ];
-    
-    parsedData.NEWS.turkeyNews = parseNewsRows(bbcTrRows, 'BBC Turkey');
-    
-    setData(parsedData);
-    setError(null);
-  } catch (err) {
-    console.error('Error fetching data:', err);
-    setError(err.message);
-  } finally {
-    setRefreshing(false);
-    setLoading(false);
-  }
-};
+  };
 
-// Helper function to parse news rows
-const parseNewsRows = (rows, source) => {
-  const news = [];
-  for (let i = 1; i < rows.length; i++) { // Skip header row
-    const row = rows[i];
-    if (!row || row.length < 1) continue;
-    
-    const title = row[0]; // Column A
-    const url = row[2]; // Column C
-    if (!title) continue;
-    
-    news.push({
-      source: source,
-      time: 'Recent', // We don't have timestamp data, so use "Recent"
-      title: title,
-      url: url,
-    });
-  }
-  return news;
-};
+  // Helper function to parse news rows
+  const parseNewsRows = (rows, source) => {
+    const news = [];
+    for (let i = 1; i < rows.length; i++) { // Skip header row
+      const row = rows[i];
+      if (!row || row.length < 1) continue;
+
+      const title = row[0]; // Column A
+      const url = row[2]; // Column C
+      if (!title) continue;
+
+      news.push({
+        source: source,
+        time: 'Recent', // We don't have timestamp data, so use "Recent"
+        title: title,
+        url: url,
+      });
+    }
+    return news;
+  };
 
   // Parse sheet rows into structured data
   const parseSheetData = (rows) => {
@@ -244,7 +245,7 @@ const parseNewsRows = (rows, source) => {
           >
             <div className="flex items-start gap-2 mb-1">
               <span className={`text-[10px] px-2 py-0.5 rounded font-medium flex-shrink-0 ${item.source === 'BBC' || item.source === 'BBC Turkey' ? 'bg-rose-900/40 text-rose-300 border border-rose-800/30' :
-                  'bg-blue-900/40 text-blue-300 border border-blue-800/30'
+                'bg-blue-900/40 text-blue-300 border border-blue-800/30'
                 }`}>
                 {item.source}
               </span>
@@ -322,13 +323,41 @@ const parseNewsRows = (rows, source) => {
           <h1 className="text-2xl md:text-3xl font-bold text-emerald-400">Market Dashboard</h1>
           <p className="text-sm text-slate-400 mt-1">{data?.lastUpdated}</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-700 to-emerald-800 text-emerald-50 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-900/50 border border-emerald-600/30"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowUpdateMenu(!showUpdateMenu)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-700 to-emerald-800 text-emerald-50 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-900/50 border border-emerald-600/30"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Update</span>
+          </button>
+
+          {showUpdateMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg">
+                Update All
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                Update World News
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                Update Turkey News
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                Update Indices
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                Update Futures
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                Update Currencies
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg">
+                Update Crypto
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Tab Navigation */}
@@ -484,5 +513,5 @@ const parseNewsRows = (rows, source) => {
 };
 
 export default TabbedDashboard;
-// Force rebuild 
+// Force rebuild
 // Force rebuild 
