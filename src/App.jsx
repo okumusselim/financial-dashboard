@@ -1,9 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, RefreshCw, Activity, DollarSign, BarChart3, Newspaper, Bitcoin } from 'lucide-react';
 
+// Toast notification component
+const Toast = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed top-4 right-4 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md">
+      <div className="flex items-center gap-2">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        <span>{message}</span>
+      </div>
+    </div>
+  );
+};
+
 // Configuration
 const SHEET_ID = import.meta.env.VITE_SHEET_ID || '1OuEvGdiiG8qQSEbAIVaMyitUsr2bBc6WaxnyjjvC1Uc';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+
+// Webhook URLs for updates (add your n8n webhook URLs here)
+const WEBHOOKS = {
+  UPDATE_CURRENCIES: 'https://selim-okumus1.app.n8n.cloud/webhook/update-fx',
+  UPDATE_CRYPTO: 'https://selim-okumus1.app.n8n.cloud/webhook/update-crypto',
+  // Add more webhooks as you create them:
+  // UPDATE_TURKEY_NEWS: 'YOUR_TURKEY_NEWS_WEBHOOK_URL',
+  // UPDATE_INDICES: 'YOUR_INDICES_WEBHOOK_URL',
+  // etc.
+};
+
 console.log('API Key loaded:', API_KEY ? 'YES' : 'NO');
 console.log('Sheet ID:', SHEET_ID);
 const TabbedDashboard = () => {
@@ -19,6 +47,43 @@ const TabbedDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showUpdateMenu, setShowUpdateMenu] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Trigger webhook update
+  const triggerWebhookUpdate = async (webhookType, displayName) => {
+    const webhookUrl = WEBHOOKS[webhookType];
+    
+    if (!webhookUrl || webhookUrl.includes('YOUR_')) {
+      setToast(`Webhook for ${displayName} not configured yet`);
+      return;
+    }
+
+    setToast(`Updating ${displayName}... This may take 2-3 minutes.`);
+    setShowUpdateMenu(false);
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Wait a bit then refresh the data
+        setTimeout(async () => {
+          await fetchSheetData();
+          setToast(`${displayName} updated successfully!`);
+        }, 3000);
+      } else {
+        setToast(`Failed to update ${displayName}`);
+      }
+    } catch (error) {
+      console.error('Webhook error:', error);
+      setToast(`Error updating ${displayName}`);
+    }
+  };
 
   // Fetch data from Google Sheets
   // Fetch data from Google Sheets
@@ -72,6 +137,13 @@ const TabbedDashboard = () => {
 
       setData(parsedData);
       setError(null);
+      setLastUpdated(new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }));
     } catch (err) {
       console.error('Error fetching data:', err);
       setError(err.message);
@@ -167,6 +239,18 @@ const TabbedDashboard = () => {
   useEffect(() => {
     fetchSheetData();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUpdateMenu && !event.target.closest('.relative')) {
+        setShowUpdateMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUpdateMenu]);
 
   const handleRefresh = () => {
     fetchSheetData();
@@ -317,11 +401,16 @@ const TabbedDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/30 p-3 md:p-6">
+      {/* Toast Notification */}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-emerald-400">Market Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">{data?.lastUpdated}</p>
+          <p className="text-sm text-slate-400 mt-1">
+            {lastUpdated ? `Last updated: ${lastUpdated}` : data?.lastUpdated}
+          </p>
         </div>
         <div className="relative">
           <button
@@ -334,25 +423,46 @@ const TabbedDashboard = () => {
 
           {showUpdateMenu && (
             <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_ALL', 'All Data')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg"
+              >
                 Update All
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_WORLD_NEWS', 'World News')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+              >
                 Update World News
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_TURKEY_NEWS', 'Turkey News')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+              >
                 Update Turkey News
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_INDICES', 'Indices')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+              >
                 Update Indices
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_FUTURES', 'Futures')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+              >
                 Update Futures
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_CURRENCIES', 'Currencies')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+              >
                 Update Currencies
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg">
+              <button 
+                onClick={() => triggerWebhookUpdate('UPDATE_CRYPTO', 'Crypto')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg"
+              >
                 Update Crypto
               </button>
             </div>
