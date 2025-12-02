@@ -9,33 +9,30 @@ export default async function handler(req, res) {
 
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   // Only allow POST requests
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { webhookType } = req.body;
+
+  // Map webhook types to n8n URLs
+  const webhookUrls = {
+    UPDATE_CURRENCIES: 'https://selim-okums1.app.n8n.cloud/webhook/update-fx',
+    UPDATE_CRYPTO: 'https://selim-okums1.app.n8n.cloud/webhook/update-crypto',
+  };
+
+  const targetUrl = webhookUrls[webhookType];
+
+  if (!targetUrl) {
+    return res.status(400).json({ error: 'Invalid webhook type' });
   }
 
   try {
-    const { webhookType } = req.body;
-
-    // Map webhook types to n8n URLs
-    const webhookUrls = {
-      UPDATE_CURRENCIES: 'https://selim-okums1.app.n8n.cloud/webhook/update-fx',
-      UPDATE_CRYPTO: 'https://selim-okums1.app.n8n.cloud/webhook/update-crypto',
-    };
-
-    const targetUrl = webhookUrls[webhookType];
-
-    if (!targetUrl) {
-      res.status(400).json({ error: 'Invalid webhook type' });
-      return;
-    }
-
-    // Forward request to n8n
+    // Make request to n8n webhook using fetch (available in Node 18+)
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
@@ -44,12 +41,22 @@ export default async function handler(req, res) {
     });
 
     if (response.ok) {
-      res.status(200).json({ success: true, message: 'Webhook triggered successfully' });
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Webhook triggered successfully' 
+      });
     } else {
-      res.status(500).json({ error: 'Webhook failed' });
+      console.error('n8n webhook returned status:', response.status);
+      return res.status(500).json({ 
+        error: 'Webhook failed',
+        status: response.status 
+      });
     }
   } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Proxy error:', error.message);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message 
+    });
   }
 }
